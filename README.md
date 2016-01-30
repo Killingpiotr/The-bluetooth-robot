@@ -1,0 +1,129 @@
+# The-bluetooth-robot
+The code for my bluetooth controlled robot
+//Pierre BAREL 
+// 01/01/2016
+//Communication port serie :
+//1=avant=49 2=droite=50 3=gauche=51 4=arriere=52 0=stop=48
+// HC-04:
+// pin trig capteur 2 (face) = A0
+// pin echo capteur 2 (face) = A1
+#include <AFMotor.h>
+#define VitesseMax 255
+#define DistanceMin 25
+#define Arret 48
+#define VersAvant 49
+#define VersDroite 50
+#define VersGauche 51
+#define VersArriere 52
+#define TempsWhileDist 200
+#define PinEchoCapteur 7
+#define PinTriggCapteur 6
+#define CorrVitesse 4
+#define TempsAvant 500
+#define TempsTourne 1200
+#define TempsArriere 700
+AF_DCMotor moteurD(4);
+AF_DCMotor moteurG(2);
+byte NbreCommande=0;
+char Collision=0;
+char CollisionEnCours=0;
+
+void setup() 
+{
+  Serial.begin(9600);        // initialisation communication avc port serie à 9600 bauds
+  uint8_t i;                 //char i
+  moteurD.seSpeed(VitesseMax-CorrVitesse);
+  moteurG.setSpeed(VitesseMax);
+  moteurD.run(RELEASE);
+  moteurG.run(RELEASE);
+  pinMode(PinTriggCapteur, OUTPUT);       // pin trig capteur 2 = sortie
+  pinMode(PinEchoCapteur, INPUT);        // pin echo capteur 2 = entrée
+}
+
+void loop() 
+{
+  if (Serial.available())  //if numbre are aivailable then
+  {
+    NbreCommande = Serial.read();   // NbreCommande(OrderNumber) = number on the serial port
+    Serial.print(NbreCommande);     // Write the ordernumber on the serail port
+    if(NbreCommande==VersAvant) Avant();     //if order == 1 then go forward (Avant();) 
+    if(NbreCommande==Arret) Stop();          //if order == 0 then stop (Stop();)
+    if(NbreCommande==VersGauche) Gauche();   //if order == 3 then turn left (Gauche();)
+    if(NbreCommande==VersDroite) Droite();   //if order == 2 then turn right (Droite();)
+    if(NbreCommande==VersArriere) Arriere(); //if order == 4 then go backward (Arriere();)
+  }
+  MajDistance();  //uptade if there is a wall : if yes collision=1 else collision =0
+  
+  if(Collision==1)       // if collision==1 then
+  {
+    Eviter();            //= avoid (go backward )
+    CollisionEnCours=1;  //variable to detect line65 if the robot is mooving back
+  }
+  while(Collision==1)    //while collision == 1 then 
+  {
+    MajDistance();         //uptade if there is a wall : if yes collision=1 else collision =0
+    delay(TempsWhileDist); // wait TempsWhileDist(200 milliseconds)
+  }
+  if(CollisionEnCours==1)  //if the robot is mooving back (look line58)
+  {
+    CollisionEnCours=0;    // set the backing variable to 0
+    Stop();                // stop the motors
+  }
+}
+
+void Avant()
+{
+   moteurD.setSpeed(VitesseMax-CorrVitesse);
+   moteurG.setSpeed(VitesseMax);
+   moteurD.run(FORWARD);
+   moteurG.run(FORWARD);
+}
+void Stop()
+{
+   moteurD.run(RELEASE);
+   moteurG.run(RELEASE);
+}
+void Gauche()
+{
+   moteurD.setSpeed(VitesseMax);
+   moteurG.setSpeed(VitesseMax);
+   moteurD.run(FORWARD);
+   moteurG.run(BACKWARD);
+}
+void Droite()
+{
+   moteurD.setSpeed(VitesseMax);
+   moteurG.setSpeed(VitesseMax);
+   moteurD.run(BACKWARD);
+   moteurG.run(FORWARD);
+}
+void Arriere()
+{
+   moteurD.setSpeed(VitesseMax-CorrVitesse);
+   moteurG.setSpeed(VitesseMax);
+   moteurD.run(BACKWARD);
+   moteurG.run(BACKWARD);
+}
+void MajDistance()
+{
+  long duration, distance;
+  digitalWrite(PinTriggCapteur, LOW);  
+  delayMicroseconds(2); 
+  digitalWrite(PinTriggCapteur, HIGH);
+  delayMicroseconds(10); 
+  digitalWrite(PinTriggCapteur, LOW);
+  duration = pulseIn(PinEchoCapteur, HIGH);
+  distance = (duration/2) / 29.1;
+  if(distance<DistanceMin) Collision=1;
+  if(distance>DistanceMin) Collision=0;
+  delay(100);
+}
+void Eviter()
+{
+  Arriere();
+  delay(TempsArriere);
+  Droite();
+  delay(TempsTourne);
+  Avant();
+  delay(TempsAvant);
+ }
